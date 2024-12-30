@@ -26,3 +26,7 @@ go.work
 
 # LLM Context files
 .llm-context/
+
+# Project management files
+project_instructions.md
+project_log.md
