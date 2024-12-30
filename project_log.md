@@ -62,6 +62,13 @@ feat: implement initial TUI structure with file operations
 - Reorganized documentation structure
 - Added explicit requirements about content preservation
 
+### (1.3.4) Command Handling Improvements (2024-12-30_17:15:00 EST)
+
+- Added nil checks for Selected field in ExecuteFileOperation
+- Improved error messaging for unsupported operations
+- Fixed case sensitivity issues with IsDir method calls
+- Context: Enhancing error handling and type safety
+
 ## (1.4) In Progress
 
 - Permission modification interface
