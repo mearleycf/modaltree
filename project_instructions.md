@@ -33,6 +33,7 @@ This repository follows strict markdown formatting rules based on markdownlint s
 - Must have consistent indentation
 - Nested lists should be indented by 2 spaces
 - Must have a space after the list marker (-, *, or number)
+- Do not use * for unordered lists, markdownlint doesn't like it; use - instead
 
 ### (1.5) Code Blocks
 
