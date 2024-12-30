@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // Config holds the application configuration
@@ -126,11 +126,20 @@ func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         }
 		}
 
-	case
+	case "p":
+		if item := m.tree.GetSelectedItem(); item != nil {
+			m.input = NewInput(InputRename, item.name)
+			m.activeView = InputView
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+func main() {
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running program: %v", err)
 		os.Exit(1)
-    }
 	}
 }
