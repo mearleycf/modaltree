@@ -107,6 +107,13 @@ This repository follows strict markdown formatting rules based on markdownlint s
 - [ ] Add support for nushell
 - [ ] Consider additional shell integration features
 
+### (2.6) View Implementation Tasks
+
+- [ ] Implement TreeView rendering in View() method
+- [ ] Implement ConfirmView rendering in View() method
+- [ ] Add status bar display
+- [ ] Add visual hierarchy for tree structure
+
 ## (3) UI Design Decisions
 
 - Show permissions but no other metadata (size, dates)
@@ -160,6 +167,8 @@ A: No favorites or session memory, but keep expanded states during navigation
 
 - Never do unprompted changes. Only make changes I've instructed you to make. For example, if there is code we need to refactor, and I don't tell you to refactor it, don't refactor it. If there are functions/methods we haven't implemented yet, don't implement them until I ask you to.
 
+- CRITICAL: Never use placeholders like "[previous content...]" or similar. Always include the complete content of any file being modified. This is a strict requirement that helps prevent errors and maintain clarity.
+
 - Never cut out previous content and list it as [Previous content remains unchanged...]. This is a bad practice. Always keep the entire content in the document and add new content where appropriate.
 
 - MCP Server Tools
@@ -178,10 +187,3 @@ A: No favorites or session memory, but keep expanded states during navigation
       - *modelcontextprotocol-server-brave-search*
       - *ai-humanizer-mcp-server*
       - shell
-
-### (2.6) View Implementation Tasks
-
-- [ ] Implement TreeView rendering in View() method
-- [ ] Implement ConfirmView rendering in View() method
-- [ ] Add status bar display
-- [ ] Add visual hierarchy for tree structure
