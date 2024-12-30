@@ -26,20 +26,24 @@ const (
 
 // ExecuteFileOperation executes the given file operation
 func ExecuteFileOperation(op FileOperation) error {
+	if op.Selected == nil {
+		return fmt.Errorf("no file selected for operation")
+	}
+
 	switch op.Type {
 	case OpMove:
 		return os.Rename(op.Source, op.Dest)
 	case OpCopy:
 		return CopyFile(op.Source, op.Dest)
 	case OpDelete:
-		if op.Selected.IsDir {
+		if op.Selected.isDir {
 			return os.RemoveAll(op.Source)
 		}
 		return os.Remove(op.Source)
 	case OpRename:
 		return os.Rename(op.Source, op.Dest)
 	default:
-		return fmt.Errorf("unknown operation type: %v", op.Type)
+		return fmt.Errorf("unsupported file operation type: %v", op.Type)
 	}
 }
 
@@ -50,7 +54,7 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 
-	if sourceInfo.isDir() {
+	if sourceInfo.IsDir() {
 		return CopyDir(src, dst)
 	}
 
