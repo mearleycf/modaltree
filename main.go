@@ -88,6 +88,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) View() string {
+	if m.err != nil {
+		return fmt.Sprintf("Error: %v", m.err)
+	}
+
+	switch m.activeView {
+	case TreeView:
+		return fmt.Sprintf(
+			"%s\n%s",
+			"Tree View", // placeholder, we'll implement this later
+			m.status,
+		)
+	case InputView:
+		if m.input != nil {
+			return m.input.View()
+		}
+	case ConfirmView:
+		if m.input != nil {
+			return "Confirm View" // placeholder, we'll implement this later
+		}
+
+	}
+	
+	return "" // fallback
+}
+
 func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
