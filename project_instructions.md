@@ -172,19 +172,21 @@ A: No favorites or session memory, but keep expanded states during navigation
 
 - Never cut out previous content and list it as [Previous content remains unchanged...]. This is a bad practice. Always keep the entire content in the document and add new content where appropriate.
 
+- Never make git commits unless explicitly instructed to do so.
+
 - MCP Server Tools
-   - Don't use these tools on this project:
-      - any obsidian tool
-      - flashcard-server
-   - Use these tools on this project, explicitly:
-      - git
-      - filesystem
-      - github
-      - mcp-knowledge-graph
-      - llm-context
-      - sequential-thinking
-      - *aindreyway-mcp-neurolora*
-      - fetch
-      - *modelcontextprotocol-server-brave-search*
-      - *ai-humanizer-mcp-server*
-      - shell
+  - Don't use these tools on this project:
+    - any obsidian tool
+    - flashcard-server
+  - Use these tools on this project, explicitly:
+    - git
+    - filesystem
+    - github
+    - mcp-knowledge-graph
+    - llm-context
+    - sequential-thinking
+    - *aindreyway-mcp-neurolora*
+    - fetch
+    - *modelcontextprotocol-server-brave-search*
+    - *ai-humanizer-mcp-server*
+    - shell
