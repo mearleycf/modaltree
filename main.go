@@ -255,6 +255,12 @@ func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) SaveConfig() {
+	if err := SaveConfig(m.config); err != nil {
+		m.status = fmt.Sprintf("Error saving config: %v", err)
+	}
+}
+
 func main() {
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
