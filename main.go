@@ -4,16 +4,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Config holds the application configuration
 type Config struct {
-	ShowHidden      bool   // Show hidden files by default
-	Editor          string // Default editor command
-	ConfirmActions  bool   // Whether to confirm destructive actions
-	CurrentDir      string // Current working directory
+	ShowHidden      bool          // Show hidden files by default
+	Editor          string        // Default editor command
+	ConfirmActions  bool          // Whether to confirm destructive actions
+	CurrentDir      string        // Current working directory
+	Display         DisplayConfig // Display configuration
+	icons           IconSet       // Current icon set (determined by Display.UseNerdFont)
+	treeSymbols     TreeSymbols   // Current tree symbols (determined by Display.TreeStyle)
 }
 
 // Model represents the application state
@@ -43,11 +47,16 @@ func initialModel() Model {
 		os.Exit(1)
 	}
 
+	display := DefaultDisplayConfig()
+	
 	config := Config{
 		ShowHidden:     true,
 		Editor:         "code",
 		ConfirmActions: true,
 		CurrentDir:     cwd,
+		Display:        display,
+		icons:          UnicodeIconSet(),
+		treeSymbols:    UnicodeTreeSymbols(),
 	}
 
 	return Model{
@@ -74,11 +83,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ConfirmView:
 			return m.handleConfirmViewKeys(msg)
 		}
-	
+
 	case loadedDirectoryMsg:
 		m.tree.items = msg.items
 		return m, nil
-	
+
 	case errMsg:
 		m.err = msg.error
 		m.status = fmt.Sprintf("Error: %v", msg.error)
@@ -93,63 +102,147 @@ func (m Model) View() string {
 		return fmt.Sprintf("Error: %v", m.err)
 	}
 
+	var b strings.Builder
+
 	switch m.activeView {
 	case TreeView:
-		return fmt.Sprintf(
-			"%s\n%s",
-			"Tree View", // placeholder, we'll implement this later
-			m.status,
-		)
+		// Show current directory at top
+		b.WriteString(fmt.Sprintf("Directory: %s\n\n", m.config.CurrentDir))
+
+		// Render tree items
+		for i, item := range m.tree.items {
+			// Calculate the indentation level based on path depth
+			depth := strings.Count(item.path, string(os.PathSeparator)) -
+				strings.Count(m.config.CurrentDir, string(os.PathSeparator))
+			if depth < 0 {
+				depth = 0
+			}
+
+			// Build the tree structure
+			prefix := ""
+			for d := 0; d < depth; d++ {
+				isLast := false
+				if d == depth-1 {
+					// Check if this is the last item at this level
+					isLast = true
+					for j := i + 1; j < len(m.tree.items); j++ {
+						otherDepth := strings.Count(m.tree.items[j].path, string(os.PathSeparator)) -
+							strings.Count(m.config.CurrentDir, string(os.PathSeparator))
+						if otherDepth <= d {
+							isLast = false
+							break
+						}
+					}
+				}
+
+				if d == depth-1 {
+					if isLast {
+						prefix += m.config.treeSymbols.Corner + m.config.treeSymbols.Horizontal
+					} else {
+						prefix += m.config.treeSymbols.Tee + m.config.treeSymbols.Horizontal
+					}
+				} else {
+					if isLast {
+						prefix += "  "
+					} else {
+						prefix += m.config.treeSymbols.Vertical + " "
+					}
+				}
+			}
+
+			// Add cursor indicator
+			if i == m.tree.cursor {
+				prefix += "> "
+			} else {
+				prefix += "  "
+			}
+
+			// Get the appropriate icon
+			var icon string
+			if item.isDir {
+				if item.name == ".." {
+					icon = m.config.icons.ParentDir
+				} else if m.tree.expanded[item.path] {
+					icon = m.config.icons.DirectoryOpen
+				} else {
+					icon = m.config.icons.Directory
+				}
+			} else {
+				icon = m.config.icons.GetFileIcon(item)
+			}
+			prefix += icon + " "
+
+			// Add the item name and optional permission info
+			itemText := item.name
+			if !item.isDir {
+				itemText += fmt.Sprintf(" (%s)", item.mode.String())
+			}
+
+			// Highlight cursor line
+			if i == m.tree.cursor {
+				b.WriteString(fmt.Sprintf("\x1b[7m%s%s\x1b[0m\n", prefix, itemText))
+			} else {
+				b.WriteString(fmt.Sprintf("%s%s\n", prefix, itemText))
+			}
+		}
+
+		// Add status line at the bottom with help text
+		b.WriteString("\n")
+		if m.status != "" {
+			b.WriteString(fmt.Sprintf("%s\n", m.status))
+		}
+		b.WriteString("\nj/k: move   h/l: collapse/expand  .: toggle hidden  q: quit")
+
 	case InputView:
 		if m.input != nil {
 			return m.input.View()
 		}
+
 	case ConfirmView:
 		if m.input != nil {
 			return "Confirm View" // placeholder, we'll implement this later
 		}
-
 	}
-	
-	return "" // fallback
+
+	return b.String()
 }
 
 func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
-	
+
 	case "up", "k":
 		m.tree.MoveUp()
-	
+
 	case "down", "j":
 		m.tree.MoveDown()
-	
+
 	case "enter", "right", "l":
 		if item := m.tree.GetSelectedItem(); item != nil {
 			if item.isDir {
 				return m, m.tree.ToggleExpand()
 			}
 		}
-	
+
 	case "left", "h":
-    if item := m.tree.GetSelectedItem(); item != nil {
-        if item.name == ".." {
-            // Move up one directory level
-            m.config.CurrentDir = filepath.Dir(m.config.CurrentDir)
-            return m, m.tree.LoadDirectory(m.config.CurrentDir)
-        } else if item.isDir && m.tree.expanded[item.path] {
-            // If directory is expanded, collapse it
-            delete(m.tree.expanded, item.path)
-            return m, nil
-        } else {
-            // If it's a file or collapsed directory, try to move to parent directory
-            parentDir := filepath.Dir(item.path)
-            if parentDir != m.config.CurrentDir {
-                m.config.CurrentDir = parentDir
-                return m, m.tree.LoadDirectory(m.config.CurrentDir)
-            }
-        }
+		if item := m.tree.GetSelectedItem(); item != nil {
+			if item.name == ".." {
+				// Move up one directory level
+				m.config.CurrentDir = filepath.Dir(m.config.CurrentDir)
+				return m, m.tree.LoadDirectory(m.config.CurrentDir)
+			} else if item.isDir && m.tree.expanded[item.path] {
+				// If directory is expanded, collapse it
+				delete(m.tree.expanded, item.path)
+				return m, nil
+			} else {
+				// If it's a file or collapsed directory, try to move to parent directory
+				parentDir := filepath.Dir(item.path)
+				if parentDir != m.config.CurrentDir {
+					m.config.CurrentDir = parentDir
+					return m, m.tree.LoadDirectory(m.config.CurrentDir)
+				}
+			}
 		}
 
 	case "p":
