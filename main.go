@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Config holds the application configuration
@@ -97,9 +98,72 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// Styles for different elements
+var (
+	directoryStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
+	fileStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
+	executableStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	selectedStyle  = lipgloss.NewStyle().Reverse(true)
+	statusStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	headerStyle    = lipgloss.NewStyle().Bold(true)
+	errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+)
+
+func (m Model) renderTreeItem(item FileItem, i int, depth int, isLastAtLevel bool) string {
+	// Calculate indentation and tree symbols
+	prefix := strings.Repeat(" ", m.config.Display.IndentSize * (depth-1))
+	if depth > 0 {
+		if isLastAtLevel {
+			prefix += m.config.treeSymbols.Corner + m.config.treeSymbols.Horizontal
+		} else {
+			prefix += m.config.treeSymbols.Tee + m.config.treeSymbols.Horizontal
+		}
+	}
+
+	// Add cursor indicator
+	if i == m.tree.cursor {
+		prefix += "> "
+	} else {
+		prefix += "  "
+	}
+
+	// Get appropriate icon and style
+	var icon string
+	var itemStyle lipgloss.Style
+	if item.isDir {
+		itemStyle = directoryStyle
+		if item.name == ".." {
+			icon = m.config.icons.ParentDir
+		} else if m.tree.expanded[item.path] {
+			icon = m.config.icons.DirectoryOpen
+		} else {
+			icon = m.config.icons.Directory
+		}
+	} else {
+		if item.mode&0111 != 0 { // Executable file
+			itemStyle = executableStyle
+		} else {
+			itemStyle = fileStyle
+		}
+		icon = m.config.icons.GetFileIcon(item)
+	}
+	
+	// Construct item text
+	itemText := fmt.Sprintf("%s%s %s", prefix, icon, item.name)
+	if !item.isDir {
+		itemText += fmt.Sprintf(" (%s)", item.mode.String())
+	}
+
+	// Apply highlighting if selected
+	if i == m.tree.cursor {
+		return selectedStyle.Render(itemText)
+	}
+	return itemStyle.Render(itemText)
+}
+
 func (m Model) View() string {
 	if m.err != nil {
-		return fmt.Sprintf("Error: %v", m.err)
+		return errorStyle.Render(fmt.Sprintf("Error: %v", m.err))
 	}
 
 	var b strings.Builder
@@ -107,91 +171,42 @@ func (m Model) View() string {
 	switch m.activeView {
 	case TreeView:
 		// Show current directory at top
-		b.WriteString(fmt.Sprintf("Directory: %s\n\n", m.config.CurrentDir))
+		currentDirText := fmt.Sprintf("Directory: %s", m.config.CurrentDir)
+		b.WriteString(headerStyle.Render(currentDirText) + "\n\n")
 
-		// Render tree items
+		// Calculate last items at each level for proper tree lines
+		lastAtLevel := make(map[int]bool)
 		for i, item := range m.tree.items {
-			// Calculate the indentation level based on path depth
 			depth := strings.Count(item.path, string(os.PathSeparator)) -
 				strings.Count(m.config.CurrentDir, string(os.PathSeparator))
 			if depth < 0 {
 				depth = 0
 			}
 
-			// Build the tree structure
-			prefix := ""
-			for d := 0; d < depth; d++ {
-				isLast := false
-				if d == depth-1 {
-					// Check if this is the last item at this level
-					isLast = true
-					for j := i + 1; j < len(m.tree.items); j++ {
-						otherDepth := strings.Count(m.tree.items[j].path, string(os.PathSeparator)) -
-							strings.Count(m.config.CurrentDir, string(os.PathSeparator))
-						if otherDepth <= d {
-							isLast = false
-							break
-						}
-					}
-				}
-
-				if d == depth-1 {
-					if isLast {
-						prefix += m.config.treeSymbols.Corner + m.config.treeSymbols.Horizontal
-					} else {
-						prefix += m.config.treeSymbols.Tee + m.config.treeSymbols.Horizontal
-					}
-				} else {
-					if isLast {
-						prefix += "  "
-					} else {
-						prefix += m.config.treeSymbols.Vertical + " "
-					}
+			// Check if this is the last item at its level
+			isLast := true
+			for j := i + 1; j < len(m.tree.items); j++ {
+				nextDepth := strings.Count(m.tree.items[j].path, string(os.PathSeparator)) -
+					strings.Count(m.config.CurrentDir, string(os.PathSeparator))
+				if nextDepth <= depth {
+					isLast = false
+					break
 				}
 			}
+			lastAtLevel[depth] = isLast
 
-			// Add cursor indicator
-			if i == m.tree.cursor {
-				prefix += "> "
-			} else {
-				prefix += "  "
-			}
-
-			// Get the appropriate icon
-			var icon string
-			if item.isDir {
-				if item.name == ".." {
-					icon = m.config.icons.ParentDir
-				} else if m.tree.expanded[item.path] {
-					icon = m.config.icons.DirectoryOpen
-				} else {
-					icon = m.config.icons.Directory
-				}
-			} else {
-				icon = m.config.icons.GetFileIcon(item)
-			}
-			prefix += icon + " "
-
-			// Add the item name and optional permission info
-			itemText := item.name
-			if !item.isDir {
-				itemText += fmt.Sprintf(" (%s)", item.mode.String())
-			}
-
-			// Highlight cursor line
-			if i == m.tree.cursor {
-				b.WriteString(fmt.Sprintf("\x1b[7m%s%s\x1b[0m\n", prefix, itemText))
-			} else {
-				b.WriteString(fmt.Sprintf("%s%s\n", prefix, itemText))
-			}
+			// Render the item
+			b.WriteString(m.renderTreeItem(item, i, depth, isLast))
+			b.WriteString("\n")
 		}
 
-		// Add status line at the bottom with help text
+		// Add status and help text
 		b.WriteString("\n")
 		if m.status != "" {
-			b.WriteString(fmt.Sprintf("%s\n", m.status))
+			b.WriteString(statusStyle.Render(m.status) + "\n")
 		}
-		b.WriteString("\nj/k: move   h/l: collapse/expand  .: toggle hidden  q: quit")
+		helpText := "\nj/k: move   h/l: collapse/expand   .: toggle hidden   q: quit"
+		b.WriteString(helpText)
 
 	case InputView:
 		if m.input != nil {
@@ -251,6 +266,10 @@ func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.activeView = InputView
 			return m, nil
 		}
+
+	case ".":
+		m.tree.showHidden = !m.tree.showHidden
+		return m, m.tree.LoadDirectory(m.config.CurrentDir)
 	}
 	return m, nil
 }
