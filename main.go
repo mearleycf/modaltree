@@ -162,12 +162,9 @@ func (m Model) renderTreeItem(item FileItem, i int, depth int, isLastAtLevel boo
 }
 
 func (m Model) View() string {
-	if m.err != nil {
-		return errorStyle.Render(fmt.Sprintf("Error: %v", m.err))
-	}
-
 	var b strings.Builder
 
+	// Render main content based on active view
 	switch m.activeView {
 	case TreeView:
 		// Show current directory at top
@@ -200,13 +197,17 @@ func (m Model) View() string {
 			b.WriteString("\n")
 		}
 
-		// Add status and help text
+		// Preserve existing status and help text
 		b.WriteString("\n")
 		if m.status != "" {
 			b.WriteString(statusStyle.Render(m.status) + "\n")
 		}
 		helpText := "\nj/k: move   h/l: collapse/expand   .: toggle hidden   q: quit"
 		b.WriteString(helpText)
+
+		// Add status bar below help text
+		b.WriteString("\n")
+		b.WriteString(m.statusBar.View())
 
 	case InputView:
 		if m.input != nil {
@@ -221,7 +222,40 @@ func (m Model) View() string {
 
 	return b.String()
 }
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// Update status bar width
+		m.statusBar.Update(msg)
 
+	case FileOperation:
+		// Update status bar with operation state
+		m.statusBar.UpdateOperation(msg.state)
+		return m, nil
+
+	case loadedDirectoryMsg:
+		m.tree.items = msg.items
+		m.statusBar.UpdatePath(m.config.CurrentDir)
+		return m, nil
+
+	case errMsg:
+		m.err = msg.error
+		m.status = fmt.Sprintf("Error: %v", msg.error)
+		m.statusBar.setMessage(fmt.Sprintf("Error: %v", msg.error), MessageError)
+		return m, nil
+	}
+
+	switch m.activeView {
+	case TreeView:
+		return m.handleTreeViewKeys(msg)
+	case InputView:
+		return m.handleInputViewKeys(msg)
+	case ConfirmView:
+		return m.handleConfirmViewKeys(msg)
+	}
+
+	return m, nil
+}
 func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
