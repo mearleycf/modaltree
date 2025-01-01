@@ -3,18 +3,22 @@ package main
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// StatusBar represents the status bar component that displays current path,
-// operation status, and system messages
+// StatusBar represents the status bar component
 type StatusBar struct {
 	width       int
 	currentPath string
 	message     string
 	messageType MessageType
 	operation   *OperationState
+	progress    float64
+	isActive    bool
+	spinner     spinner.Model
+	isCanceling bool
 }
 
 // MessageType defines the type of message being displayed in the status bar
@@ -49,53 +53,73 @@ var (
 		Foreground(lipgloss.Color("2"))
 )
 
-// NewStatusBar creates and initializes a new StatusBar instance
-func NewStatusBar() StatusBar {
-	return StatusBar{
-		messageType: MessageNormal,
-	}
+// stage descriptions for different operation stages
+var stageDescriptions = map[OperationStage]string{
+	StageInit:      "Preparing",
+	StageValidated: "Validated",
+	StageBackedUp:  "Backed up",
+	StageExecuting: "Executing",
+	StageCompleted: "Completed",
+	StageFailed:    "Failed",
+	StageRestored:  "Restored",
 }
 
-// Init initializes the status bar component
-// Implements tea.Model interface
-func (s StatusBar) Init() tea.Cmd {
-	return nil
-}
-
-// Update handles messages and updates the status bar state
-// Implements tea.Model interface
-func (s StatusBar) Update(msg tea.Msg) (StatusBar, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		s.width = msg.Width
+// Add method to handle cancellation state
+func (s *StatusBar) SetCanceling(canceling bool) {
+	s.isCanceling = canceling
+	if canceling {
+		s.setMessage("Canceling operation...", MessageNormal)
 	}
-	return s, nil
 }
 
 // View renders the status bar component
-// Implements tea.Model interface
 func (s StatusBar) View() string {
-	// Select appropriate message style based on message type
-	var messageStyle lipgloss.Style
-	switch s.messageType {
-	case MessageError:
-		messageStyle = errorMessageStyle
-	case MessageSuccess:
-		messageStyle = successMessageStyle
-	default:
-		messageStyle = normalMessageStyle
+	var content string
+	if s.isActive && s.operation != nil {
+		stageText := stageDescriptions[s.operation.Stage]
+		if s.isCanceling {
+			stageText = "Canceling"
+		}
+	
+		progressBar := fmt.Sprintf("[%s: %.0f%%] %s", 
+			stageText,
+			s.progress, 
+			s.spinner.View())
+	
+		content = lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			s.currentPath,
+			" | ",
+			progressBar,
+			" | ",
+			s.getMessageWithStyle(),
+		)
+	} else {
+		content = lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			s.currentPath,
+			" | ",
+			s.getMessageWithStyle(),
+		)
 	}
-
-	// Compose the status bar content with current path and message
-	content := lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		s.currentPath,
-		messageStyle.Render(s.message),
-	)
 
 	return statusBarStyle.Width(s.width).Render(content)
 }
+func (s *StatusBar) StartProgress() {
+	s.isActive = true
+	s.progress = 0
+	s.spinner = spinner.New()
+	s.spinner.Spinner = spinner.Line
+}
 
+func (s *StatusBar) UpdateProgress(progress float64) {
+	s.progress = progress
+}
+
+func (s *StatusBar) StopProgress() {
+	s.isActive = false
+	s.progress = 0
+}
 // UpdateOperation updates the status bar with current operation state
 func (s *StatusBar) UpdateOperation(op *OperationState) {
 	s.operation = op
@@ -159,4 +183,20 @@ func getOperationName(opType OperationType) string {
 	default:
 		return "unknown"
 	}
+}
+
+// getMessageWithStyle returns the status message with appropriate styling
+func (s StatusBar) getMessageWithStyle() string {
+    switch s.messageType {
+    case MessageError:
+        return errorMessageStyle.Render(s.message)
+    case MessageSuccess:
+        return successMessageStyle.Render(s.message)
+    default:
+        return normalMessageStyle.Render(s.message)
+    }
+}
+
+func (s *StatusBar) Update(msg tea.WindowSizeMsg) {
+    s.width = msg.Width
 }
