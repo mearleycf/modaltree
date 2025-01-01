@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,7 +29,9 @@ type Model struct {
 	input      *Input
 	status     string
 	err        error
-	activeView View // current view (tree, input, confirm)
+	activeView View
+	cleanup    context.CancelFunc
+	statusBar  *StatusBar
 }
 
 type View int
@@ -40,12 +43,10 @@ const (
 )
 
 // Initial setup function
-func initialModel() Model {
+func initialModel() (Model, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		// Handle error gracefully
-		fmt.Println("Error getting current directory:", err)
-		os.Exit(1)
+		return Model{}, fmt.Errorf("failed to get working directory: %w", err)
 	}
 
 	display := DefaultDisplayConfig()
@@ -64,38 +65,11 @@ func initialModel() Model {
 		config:     config,
 		tree:       NewFileTree(cwd),
 		activeView: TreeView,
-	}
+		statusBar: NewStatusBar(),
+	}, nil
 }
-
 func (m Model) Init() tea.Cmd {
-	// Initial command to load directory contents
 	return m.tree.LoadDirectory(m.config.CurrentDir)
-}
-
-// Update handles all the key events and updates the model accordingly
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch m.activeView {
-		case TreeView:
-			return m.handleTreeViewKeys(msg)
-		case InputView:
-			return m.handleInputViewKeys(msg)
-		case ConfirmView:
-			return m.handleConfirmViewKeys(msg)
-		}
-
-	case loadedDirectoryMsg:
-		m.tree.items = msg.items
-		return m, nil
-
-	case errMsg:
-		m.err = msg.error
-		m.status = fmt.Sprintf("Error: %v", msg.error)
-		return m, nil
-	}
-
-	return m, nil
 }
 
 // Styles for different elements
@@ -229,8 +203,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusBar.Update(msg)
 
 	case FileOperation:
-		// Update status bar with operation state
+		m.statusBar.StartProgress()
 		m.statusBar.UpdateOperation(msg.state)
+		m.statusBar.UpdateProgress(msg.state.Progress)
+		return m, nil
+
+	case OperationProgress:
+		m.statusBar.UpdateProgress(msg.Progress)
 		return m, nil
 
 	case loadedDirectoryMsg:
@@ -247,15 +226,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.activeView {
 	case TreeView:
-		return m.handleTreeViewKeys(msg)
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			return m.handleTreeViewKeys(keyMsg)
+		}
 	case InputView:
-		return m.handleInputViewKeys(msg)
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			return m.handleInputViewKeys(keyMsg) // implement this function
+		}
 	case ConfirmView:
-		return m.handleConfirmViewKeys(msg)
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			return m.handleConfirmViewKeys(keyMsg) // Implement this function
+		}
 	}
 
 	return m, nil
 }
+
 func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
@@ -315,9 +301,48 @@ func (m Model) SaveConfig() {
 }
 
 func main() {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	model, err := initialModel()
+	if err != nil {
+		fmt.Printf("Error initializing model: %v", err)
+		os.Exit(1)
+	}
+	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running program: %v", err)
 		os.Exit(1)
+	}
+}
+
+// Add validation method to Config struct
+func (c *Config) Validate() error {
+    if c.Editor == "" {
+        return fmt.Errorf("editor cannot be empty")
+    }
+    if c.CurrentDir == "" {
+        return fmt.Errorf("current directory cannot be empty")
+    }
+    return nil
+}
+
+// Extract view rendering interface
+type Renderer interface {
+    Render() string
+}
+
+// Make FileTree implement Renderer
+func (ft *FileTree) Render(config Config) string {
+    // Move tree rendering logic here
+		return "" // Placeholder, replace with actual rendering logic
+}
+
+const (
+    DefaultIndentSize = 2
+    MinWindowWidth    = 80
+    MaxItemsToDisplay = 1000
+)
+
+func NewStatusBar() *StatusBar {
+	return &StatusBar{
+		width: MinWindowWidth,
 	}
 }
