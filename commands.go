@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -36,12 +38,25 @@ func NewFileOperation(opType OperationType, source, dest string, selected *FileI
 
 // OperationState tracks the state of a file operation
 type OperationState struct {
-	Operation FileOperation
+	Operation  FileOperation
 	BackupPath string
-	StartTime time.Time
+	StartTime  time.Time
 	RetryCount int
-	LastError error
-	Stage OperationStage
+	LastError  error
+	Stage      OperationStage
+	Progress   float64    // Add this field
+}
+
+// Add this function
+func handleOperationError(op FileOperation, err error, backup string) {
+	op.state.Stage = StageFailed
+	op.state.LastError = err
+	if backup != "" {
+		if restoreErr := restoreBackup(backup, op.Source); restoreErr != nil {
+			op.state.LastError = fmt.Errorf("restore failed: %v (original: %v)", restoreErr, err)
+		}
+		op.state.Stage = StageRestored
+	}
 }
 
 type OperationStage int
@@ -69,7 +84,7 @@ const (
 // ValidatePermissions checks if we have required permissions for the operation
 func ValidatePermissions(op FileOperation) error {
 	// Check source permissions
-	sourceInfo, err := os.Stat(op.Source)
+	_, err := os.Stat(op.Source)
 	if err != nil {
 		return fmt.Errorf("cannot access source: %w", err)
 	}
@@ -114,7 +129,6 @@ func ValidatePermissions(op FileOperation) error {
 
 	return nil
 }
-
 // createBackup creates a backup of the file/directory being operated on
 func createBackup(path string) (string, error) {
 	backupPath := fmt.Sprintf("%s.bak.%d", path, time.Now().UnixNano())
@@ -155,6 +169,10 @@ func ExecuteFileOperation(op FileOperation) error {
 		return fmt.Errorf("no file selected for operation")
 	}
 
+	// Start progress tracking
+	op.state.Stage = StageInit
+	op.state.Progress = 0
+
 	// Validate permissions before attempting operation
 	if err := ValidatePermissions(op); err != nil {
 		op.state.Stage = StageFailed
@@ -162,6 +180,7 @@ func ExecuteFileOperation(op FileOperation) error {
 		return fmt.Errorf("permission check failed: %w", err)
 	}
 	op.state.Stage = StageValidated
+	op.state.Progress = 25
 
 	// Create backup for destructive operations
 	var backup string
@@ -175,46 +194,93 @@ func ExecuteFileOperation(op FileOperation) error {
 		}
 		op.state.BackupPath = backup
 		op.state.Stage = StageBackedUp
-		defer os.Remove(backup) // Clean up backup on success
+		op.state.Progress = 50
+		defer os.Remove(backup)
 	}
 
 	op.state.Stage = StageExecuting
-	// Execute operation with retries
+	op.state.Progress = 75
+
+	// Execute operation with retries and progress updates
 	err = retryOperation(func() error {
 		op.state.RetryCount++
-		switch op.Type {
-		case OpMove:
-			return os.Rename(op.Source, op.Dest)
-		case OpCopy:
-			return CopyFile(op.Source, op.Dest)
-		case OpDelete:
-			if op.Selected.isDir {
-				return os.RemoveAll(op.Source)
-			}
-			return os.Remove(op.Source)
-		case OpRename:
-			return os.Rename(op.Source, op.Dest)
-		default:
-			return fmt.Errorf("unsupported file operation type: %v", op.Type)
-		}
+		return executeWithProgress(op)
 	})
 
-	// If operation failed and we have a backup, try to restore
 	if err != nil {
-		op.state.Stage = StageFailed
-		op.state.LastError = err
-
-		if backup != "" {
-			if restoreErr := restoreBackup(backup, op.Source); restoreErr != nil {
-				return fmt.Errorf("operation failed and backup restoration failed: %v (original error: %v)", restoreErr, err)
-			}
-			op.state.Stage = StageRestored
-			return fmt.Errorf("operation failed but backup restored: %w", err)
-		}
+		handleOperationError(op, err, backup)
+		return err
 	}
 
 	op.state.Stage = StageCompleted
-	return err
+	op.state.Progress = 100
+	return nil
+}
+
+func executeWithProgress(op FileOperation) error {
+	switch op.Type {
+	case OpMove:
+		return os.Rename(op.Source, op.Dest)
+	case OpCopy:
+		return CopyFileWithProgress(op)
+	case OpDelete:
+		if op.Selected.isDir {
+			return os.RemoveAll(op.Source)
+		}
+		return os.Remove(op.Source)
+	case OpRename:
+		return os.Rename(op.Source, op.Dest)
+	default:
+		return fmt.Errorf("unsupported file operation type: %v", op.Type)
+	}
+}
+
+// CopyFileWithProgress copies a file from source to destination with progress tracking
+func CopyFileWithProgress(op FileOperation) error {
+	sourceInfo, err := os.Stat(op.Source)
+	if err != nil {
+		return err
+	}
+
+	if sourceInfo.IsDir() {
+		return CopyDirWithProgress(op)
+	}
+
+	totalSize := sourceInfo.Size()
+	source, err := os.Open(op.Source)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	dest, err := os.Create(op.Dest)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	buf := make([]byte, 32*1024)
+	var bytesWritten int64
+
+	for {
+		n, err := source.Read(buf)
+		if n > 0 {
+			_, writeErr := dest.Write(buf[:n])
+			if writeErr != nil {
+				return writeErr
+			}
+			bytesWritten += int64(n)
+			op.state.Progress = float64(bytesWritten) / float64(totalSize) * 100
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // CopyFile copies a file from source to destination
@@ -240,7 +306,6 @@ func CopyFile(src, dst string) error {
 
 	return os.WriteFile(dst, input, sourceInfo.Mode())
 }
-
 // CopyDir recursively copies a directory
 func CopyDir(src, dst string) error {
 	srcInfo, err := os.Stat(src)
@@ -301,3 +366,63 @@ func ChangeShellDirectory(dir string) error {
 	return err
 }
 
+
+// Add new message type for progress updates
+type OperationProgress struct {
+    Progress float64
+}
+
+// Add to existing code
+func CopyDirWithProgress(op FileOperation) error {
+    // Get total items to process
+    var totalItems int
+    filepath.Walk(op.Source, func(path string, info os.FileInfo, err error) error {
+        totalItems++
+        return nil
+    })
+
+    itemsProcessed := 0
+
+    srcInfo, err := os.Stat(op.Source)
+    if err != nil {
+        return err
+    }
+
+    err = os.MkdirAll(op.Dest, srcInfo.Mode())
+    if err != nil {
+        return err
+    }
+
+    entries, err := os.ReadDir(op.Source)
+    if err != nil {
+        return err
+    }
+
+    for _, entry := range entries {
+        srcPath := filepath.Join(op.Source, entry.Name())
+        dstPath := filepath.Join(op.Dest, entry.Name())
+
+        if entry.IsDir() {
+            subOp := op
+            subOp.Source = srcPath
+            subOp.Dest = dstPath
+            err = CopyDirWithProgress(subOp)
+        } else {
+            err = CopyFileWithProgress(FileOperation{
+                Type: OpCopy,
+                Source: srcPath,
+                Dest: dstPath,
+                state: op.state,
+            })
+        }
+
+        if err != nil {
+            return err
+        }
+
+        itemsProcessed++
+        op.state.Progress = float64(itemsProcessed) / float64(totalItems) * 100
+    }
+
+    return nil
+}
