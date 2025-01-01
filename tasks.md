@@ -6,10 +6,12 @@
 
 - [x] [COMPLETED] [P0] Basic file tree visualization
 - [x] [COMPLETED] [P0] Hidden file toggle support 
-- [ ] [IN_PROGRESS] [P0] Tree view improvements
+- [x] [COMPLETED] [P0] Tree view improvements
   - Visual hierarchy indicators
   - Directory expansion markers
   - File type icons
+  - Color coding for different file types
+  - Nerd font icon support with fallback
 - [ ] [PENDING] [P2] Performance optimization
   - Lazy loading for expanded directories
   - Virtual scrolling for large directories
@@ -21,11 +23,13 @@
   - Recovery options for failed operations
   - Permission validation checks
   - User-friendly error messages
+  - Destination collision detection
 - [ ] [BLOCKED] [P1] Large operation handling
   Dependencies: Status bar implementation
   - Progress indicators
   - Cancellation support
   - Memory usage optimization
+  - Operation progress tracking
 
 ## (1.2) User Interface
 
@@ -36,6 +40,8 @@
   - Path autocompletion
   - Input validation
   - History support
+  - Path validity checking
+  - Permission validation
 - [ ] [PENDING] [P2] Advanced input features
   - Tab completion
   - Syntax highlighting for paths
@@ -47,6 +53,7 @@
   - Operation progress display
   - Current path indicator
   - Error message display
+  - Visual feedback for operations
 - [ ] [PENDING] [P1] Help overlay system
   - Keyboard shortcut guide
   - Command reference
@@ -56,10 +63,13 @@
 
 ### (1.3.1) Settings Management
 
+- [x] [COMPLETED] [P1] Basic configuration system
 - [ ] [PENDING] [P1] Configuration file support
   - YAML configuration parsing
   - Default settings management
   - Runtime configuration updates
+  - Config validation
+  - Config reload capability
 - [ ] [PENDING] [P2] Editor integration config
   - Custom editor command support
   - Fallback editor handling
@@ -81,6 +91,7 @@
   - File operation tests
   - Navigation tests
   - Input handling tests
+  - Configuration tests
 - [ ] [PENDING] [P1] Integration tests
   - Shell integration tests
   - Editor integration tests
@@ -92,6 +103,7 @@
   - Function documentation
   - Architecture documentation
   - Contributing guidelines
+  - Go syntax and functionality guide
 - [ ] [PENDING] [P2] User documentation
   - Installation guide
   - Configuration guide
