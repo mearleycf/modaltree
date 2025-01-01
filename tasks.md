@@ -5,7 +5,7 @@
 ### (1.1.1) File Tree Features
 
 - [x] [COMPLETED] [P0] Basic file tree visualization
-- [x] [COMPLETED] [P0] Hidden file toggle support 
+- [x] [COMPLETED] [P0] Hidden file toggle support
 - [x] [COMPLETED] [P0] Tree view improvements
   - Visual hierarchy indicators
   - Directory expansion markers
@@ -52,11 +52,14 @@
 
 ### (1.2.2) Visual Feedback
 
-- [ ] [IN_PROGRESS] [P1] Status bar implementation
-  - [ ] Operation progress display
-  - [ ] Current path indicator
-  - [ ] Error message display
-  - [ ] Visual feedback for operations
+- [x] [COMPLETED] [P1] Status bar implementation
+  - [x] Operation progress display
+  - [x] Current path indicator
+  - [x] Error message display
+  - [x] Visual feedback for operations
+  - [x] Directory operation progress
+  - [x] Operation cancellation indicators
+  - [x] Multi-stage operation feedback
 - [ ] [PENDING] [P1] Help overlay system
   - [ ] Keyboard shortcut guide
   - [ ] Command reference

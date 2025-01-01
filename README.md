@@ -51,6 +51,7 @@ modaltree /path/to/directory
 ### (1.3.2) Keyboard Controls
 
 Navigation:
+
 - `↑` or `k`: Move cursor up
 - `↓` or `j`: Move cursor down
 - `←` or `h`: Go to parent directory/collapse directory
@@ -58,6 +59,7 @@ Navigation:
 - `Enter`: Open directory/Expand directory
 
 File Operations:
+
 - `e`: Open in editor (default: VS Code)
 - `m`: Move file/directory
 - `c`: Copy file/directory
@@ -66,12 +68,14 @@ File Operations:
 - `d`: Delete file/directory
 
 Other Controls:
+
 - `.`: Toggle hidden files
 - `q` or `Ctrl+C`: Quit application
 
 ### (1.3.3) Configuration
 
 By default, ModalTree uses these settings:
+
 - Shows hidden files (toggle with '.')
 - Uses 'code' (VS Code) as the default editor
 - Confirms destructive actions
