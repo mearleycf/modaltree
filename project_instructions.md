@@ -61,110 +61,56 @@ This repository follows strict markdown formatting rules based on markdownlint s
 - Must have proper column alignment markers
 - Must have consistent column widths
 
-## (2) Application Functionality Progress Checklist
-
-- [x] Default: Show hidden files
-- [x] Toggle hidden files with '.' key
-- [ ] Add configuration file for default settings
-- [ ] Fix outstanding errors in existing files
-
-### (2.1) File Operations Interface
-
-- [x] Move files: Input field with path and destination
-- [x] Copy files: Input field with path and destination
-- [ ] Add directory creation command
-- [ ] Add file creation command
-- [ ] Implement path autocompletion for input fields
-
-### (2.2) Editor Integration
-
-- [x] Default editor: VS Code ('code' command)
-- [ ] Add configuration for custom editor command
-- [ ] Handle cases where editor command isn't available
-
-### (2.3) Permissions Interface
-
-- [ ] Implement checkbox/toggle interface for permissions
-- [ ] Add visual indicator for current permissions
-- [ ] Add quick permission presets (e.g., executable)
-
-### (2.4) Key Bindings
-
-#### (2.4.1) Implemented
-
-- [x] Navigation: arrow keys and vim-style (h,j,k,l)
-- [x] Operations: e(dit), m(ove), c(opy), p/u(permissions), r(ename), d(elete)
-- [x] Utility: q(uit), .(toggle hidden)
-
-#### (2.4.2) Pending
-
-- [ ] Add configuration for custom key bindings
-- [ ] Add help overlay (press ? to view)
-
-### (2.5) Shell Integration
-
-- [x] Works with sh, bash, zsh, fish
-- [x] Changes directory on exit
-- [ ] Add support for nushell
-- [ ] Consider additional shell integration features
-
-### (2.6) View Implementation Tasks
-
-- [ ] Implement TreeView rendering in View() method
-- [ ] Implement ConfirmView rendering in View() method
-- [ ] Add status bar display
-- [ ] Add visual hierarchy for tree structure
-
-## (3) UI Design Decisions
+## (2) UI Design Decisions
 
 - Show permissions but no other metadata (size, dates)
 - No preview pane for files
 - Input fields appear at bottom of screen
 - Confirmation prompts for destructive actions (configurable)
 
-### (3.1) State Management
+### (2.1) State Management
 
 - Always open in current directory
 - Keep expanded state while navigating up
 - No session persistence
 - No favorites system
 
-## (4) Questions and Answers from Initial Planning
+## (3) Questions and Answers from Initial Planning
 
-### (4.1) File Exclusions
+### (3.1) File Exclusions
 
 Q: Specific file types or directories to exclude?
 A: Only standard hidden files, configurable with default show/hide and toggle
 
-### (4.2) File Editing
+### (3.2) File Editing
 
 Q: File editing preferences?
 A: Input field at bottom for renaming, external editor for content
 
-### (4.3) UI Layout
+### (3.3) UI Layout
 
 Q: UI layout preferences?
 A: Simple tree view with permissions, no preview pane
 A: Support both vim-style and arrow key navigation
 
-### (4.4) Shell Integration
+### (3.4) Shell Integration
 
 Q: Shell integration scope?
 A: Support all major shells, focus on directory changing
 
-### (4.5) State Persistence
+### (3.5) State Persistence
 
 Q: State persistence?
 A: No favorites or session memory, but keep expanded states during navigation
 
-## (5) Future Considerations
+## (4) Future Considerations
 
 - Performance optimization for large directories
 - Search functionality
 - Bulk operations
 - File/directory creation interface
 
-## (6) AI Instructions
+## (5) AI Instructions
 
 - Never do unprompted changes. Only make changes I've instructed you to make. For example, if there is code we need to refactor, and I don't tell you to refactor it, don't refactor it. If there are functions/methods we haven't implemented yet, don't implement them until I ask you to.
 
