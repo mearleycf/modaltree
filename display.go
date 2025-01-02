@@ -172,3 +172,5 @@ func (dc *DisplayConfig) VerifyNerdFont() bool {
 	
 	return dc.fontVerified
 }
+
+var DefaultIconSet = UnicodeIconSet()

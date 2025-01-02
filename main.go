@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -31,7 +30,7 @@ type Model struct {
 	status     string
 	err        error
 	activeView View
-	cleanup    context.CancelFunc
+	// cleanup    context.CancelFunc
 	statusBar  *StatusBar
 }
 
@@ -67,6 +66,7 @@ func initialModel() (Model, error) {
 		tree:       NewFileTree(cwd),
 		activeView: TreeView,
 		statusBar: NewStatusBar(),
+		input: nil,
 	}, nil
 }
 func (m Model) Init() tea.Cmd {
@@ -81,59 +81,64 @@ var (
 	selectedStyle  = lipgloss.NewStyle().Reverse(true)
 	statusStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 	headerStyle    = lipgloss.NewStyle().Bold(true)
-	errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	// errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 )
 
 func (m Model) renderTreeItem(item FileItem, i int, depth int, isLastAtLevel bool) string {
-	// Calculate indentation and tree symbols
-	prefix := strings.Repeat(" ", m.config.Display.IndentSize * (depth-1))
-	if depth > 0 {
-		if isLastAtLevel {
-			prefix += m.config.treeSymbols.Corner + m.config.treeSymbols.Horizontal
-		} else {
-			prefix += m.config.treeSymbols.Tee + m.config.treeSymbols.Horizontal
-		}
-	}
+    // Ensure depth is non-negative
+    if depth < 0 {
+        depth = 0
+    }
 
-	// Add cursor indicator
-	if i == m.tree.cursor {
-		prefix += "> "
-	} else {
-		prefix += "  "
-	}
+    // Calculate indentation and tree symbols
+    prefix := strings.Repeat(" ", m.config.Display.IndentSize * depth)
+    
+    // Add tree symbols only if depth > 0
+    if depth > 0 {
+        if isLastAtLevel {
+            prefix += m.config.treeSymbols.Corner + m.config.treeSymbols.Horizontal
+        } else {
+            prefix += m.config.treeSymbols.Tee + m.config.treeSymbols.Horizontal
+        }
+    }
 
-	// Get appropriate icon and style
-	var icon string
-	var itemStyle lipgloss.Style
-	if item.isDir {
-		itemStyle = directoryStyle
-		if item.name == ".." {
-			icon = m.config.icons.ParentDir
-		} else if m.tree.expanded[item.path] {
-			icon = m.config.icons.DirectoryOpen
-		} else {
-			icon = m.config.icons.Directory
-		}
-	} else {
-		if item.mode&0111 != 0 { // Executable file
-			itemStyle = executableStyle
-		} else {
-			itemStyle = fileStyle
-		}
-		icon = m.config.icons.GetFileIcon(item, m.config.Display)
-	}
-	
-	// Construct item text
-	itemText := fmt.Sprintf("%s%s %s", prefix, icon, item.name)
-	if !item.isDir {
-		itemText += fmt.Sprintf(" (%s)", item.mode.String())
-	}
+    // Rest of the function remains the same
+    if i == m.tree.cursor {
+        prefix += "> "
+    } else {
+        prefix += "  "
+    }
 
-	// Apply highlighting if selected
-	if i == m.tree.cursor {
-		return selectedStyle.Render(itemText)
-	}
-	return itemStyle.Render(itemText)
+    // Get appropriate icon and style
+    var icon string
+    var itemStyle lipgloss.Style
+    if item.isDir {
+        itemStyle = directoryStyle
+        if item.name == ".." {
+            icon = m.config.icons.ParentDir
+        } else if m.tree.expanded[item.path] {
+            icon = m.config.icons.DirectoryOpen
+        } else {
+            icon = m.config.icons.Directory
+        }
+    } else {
+        if item.mode&0111 != 0 {
+            itemStyle = executableStyle
+        } else {
+            itemStyle = fileStyle
+        }
+        icon = m.config.icons.GetFileIcon(item, m.config.Display)
+    }
+    
+    itemText := fmt.Sprintf("%s%s %s", prefix, icon, item.name)
+    if !item.isDir {
+        itemText += fmt.Sprintf(" (%s)", item.mode.String())
+    }
+
+    if i == m.tree.cursor {
+        return selectedStyle.Render(itemText)
+    }
+    return itemStyle.Render(itemText)
 }
 
 func (m Model) View() string {
@@ -243,6 +248,48 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+
+func (m Model) handleInputViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.input == nil {
+		return m, nil
+	}
+
+	if msg.Type == tea.KeyEsc {
+		m.input = nil
+		m.activeView = TreeView
+		return m, nil
+	}
+
+	_, done, cmd := m.input.Update(msg)
+	if done {
+		m.input = nil
+		m.activeView = TreeView
+		// handle input value here based on operation type
+		return m, cmd
+	}
+
+	if cmd != nil {
+		return m, cmd
+	}
+
+	return m, nil
+}
+
+func (m Model) handleConfirmViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y":
+		m.activeView = TreeView
+		// handle confirmation action here
+		return m, nil
+	case "n", "N", "q", "esc":
+		m.activeView = TreeView
+		return m, nil
+	}
+
+	return m, nil
+}
+
+
 func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
@@ -298,7 +345,7 @@ func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.config.icons = NerdFontIconSet()
 				m.config.Display.VerifyNerdFont()
 			} else {
-				m.config.icons = DefaultIconSet()
+				m.config.icons = DefaultIconSet
 			}
 	}
 
@@ -309,7 +356,7 @@ func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) SaveConfig() {
 	if err := SaveConfig(m.config); err != nil {
-		m.status = fmt.Sprintf("Error saving config: %v", err)
+		m.statusBar.setMessage(fmt.Sprintf("Error saving config: %v", err), MessageError)
 	}
 }
 
@@ -371,3 +418,4 @@ func NewStatusBar() *StatusBar {
 		width: MinWindowWidth,
 	}
 }
+
