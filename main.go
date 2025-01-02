@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -119,7 +120,7 @@ func (m Model) renderTreeItem(item FileItem, i int, depth int, isLastAtLevel boo
 		} else {
 			itemStyle = fileStyle
 		}
-		icon = m.config.icons.GetFileIcon(item)
+		icon = m.config.icons.GetFileIcon(item, m.config.Display)
 	}
 	
 	// Construct item text
@@ -176,7 +177,7 @@ func (m Model) View() string {
 		if m.status != "" {
 			b.WriteString(statusStyle.Render(m.status) + "\n")
 		}
-		helpText := "\nj/k: move   h/l: collapse/expand   .: toggle hidden   q: quit"
+		helpText := "\nj/k: move   h/l: collapse/expand   .: toggle hidden   n: toggle nerd fonts   q: quit"
 		b.WriteString(helpText)
 
 		// Add status bar below help text
@@ -290,7 +291,19 @@ func (m Model) handleTreeViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case ".":
 		m.tree.showHidden = !m.tree.showHidden
 		return m, m.tree.LoadDirectory(m.config.CurrentDir)
+		
+		case "n": // new toggle for nerd fonts
+		  m.config.Display.UseNerdFont = !m.config.Display.UseNerdFont
+			if m.config.Display.UseNerdFont {
+				m.config.icons = NerdFontIconSet()
+				m.config.Display.VerifyNerdFont()
+			} else {
+				m.config.icons = DefaultIconSet()
+			}
 	}
+
+
+
 	return m, nil
 }
 
@@ -301,11 +314,23 @@ func (m Model) SaveConfig() {
 }
 
 func main() {
+	// nerd font flag
+	useNerdFont := flag.Bool("nerd-font", false, "Enable Nerd Font Icons")
+	flag.Parse()
+
 	model, err := initialModel()
 	if err != nil {
 		fmt.Printf("Error initializing model: %v", err)
 		os.Exit(1)
 	}
+
+	// Update display config based on nerd font flag
+	model.config.Display.UseNerdFont = *useNerdFont
+	if *useNerdFont {
+		model.config.icons = NerdFontIconSet()
+		model.config.Display.VerifyNerdFont()
+	}
+
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running program: %v", err)
