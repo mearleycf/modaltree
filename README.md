@@ -70,8 +70,8 @@ File Operations:
 Other Controls:
 
 - `.`: Toggle hidden files
+- `n`: Toggle between nerd font and unicode icons
 - `q` or `Ctrl+C`: Quit application
-
 ### (1.3.3) Configuration
 
 By default, ModalTree uses these settings:
@@ -128,3 +128,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## (1.6) License
 
 [MIT License](LICENSE)
+
+### Command Line Options
+
+```bash
+modaltree -nerd-font    # Start with nerd font icons enabled

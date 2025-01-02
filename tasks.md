@@ -11,8 +11,11 @@
   - Directory expansion markers
   - File type icons
   - Color coding for different file types
-  - Nerd font icon support with fallback
-- [ ] [PENDING] [P2] Performance optimization
+  - [x] [COMPLETED] [P0] Nerd font support
+    - [x] Icon set implementation
+    - [x] Font verification
+    - [x] Runtime toggle
+    - [x] Command line flag- [ ] [PENDING] [P2] Performance optimization
   - Lazy loading for expanded directories
   - Virtual scrolling for large directories
 
